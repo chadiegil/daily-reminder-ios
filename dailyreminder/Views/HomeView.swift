@@ -46,6 +46,138 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Glassmorphic Tab Bar
+
+private struct GlassTabBar: View {
+    @Binding var selectedTab: ReminderTab
+    let todayCount: Int
+    let upcomingCount: Int
+    let overdueCount: Int
+    @Namespace private var tabAnimation
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(ReminderTab.allCases, id: \.self) { tab in
+                let isSelected = selectedTab == tab
+                Button {
+                    withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.85)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: iconFor(tab))
+                            .font(.system(size: 13, weight: .semibold))
+                            .symbolEffect(.bounce, value: isSelected)
+
+                        Text(labelFor(tab))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+
+                        Text("\(countFor(tab))")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(isSelected ? .white.opacity(0.25) : .primary.opacity(0.08))
+                            )
+                            .contentTransition(.numericText())
+                    }
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background {
+                        if isSelected {
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: gradientFor(tab),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .shadow(color: shadowColorFor(tab), radius: 8, y: 2)
+                                .matchedGeometryEffect(id: "activeTab", in: tabAnimation)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(5)
+        .background {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    Capsule()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.3),
+                                    .white.opacity(0.05),
+                                    .white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                )
+                .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    private func iconFor(_ tab: ReminderTab) -> String {
+        switch tab {
+        case .today: "sun.max.fill"
+        case .upcoming: "calendar.badge.clock"
+        case .overdue: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func labelFor(_ tab: ReminderTab) -> String {
+        switch tab {
+        case .today: "Today"
+        case .upcoming: "Soon"
+        case .overdue: "Late"
+        }
+    }
+
+    private func countFor(_ tab: ReminderTab) -> Int {
+        switch tab {
+        case .today: todayCount
+        case .upcoming: upcomingCount
+        case .overdue: overdueCount
+        }
+    }
+
+    private func gradientFor(_ tab: ReminderTab) -> [Color] {
+        switch tab {
+        case .today: [
+            Color(red: 0.25, green: 0.50, blue: 0.95),
+            Color(red: 0.35, green: 0.40, blue: 0.90)
+        ]
+        case .upcoming: [
+            Color(red: 0.40, green: 0.30, blue: 0.85),
+            Color(red: 0.50, green: 0.25, blue: 0.80)
+        ]
+        case .overdue: [
+            Color(red: 0.90, green: 0.35, blue: 0.30),
+            Color(red: 0.85, green: 0.25, blue: 0.40)
+        ]
+        }
+    }
+
+    private func shadowColorFor(_ tab: ReminderTab) -> Color {
+        switch tab {
+        case .today: .blue.opacity(0.3)
+        case .upcoming: .purple.opacity(0.3)
+        case .overdue: .red.opacity(0.3)
+        }
+    }
+}
+
 // MARK: - Content View (needs ViewModel)
 
 private struct HomeContentView: View {
@@ -54,44 +186,41 @@ private struct HomeContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Filter", selection: $viewModel.selectedTab) {
-                ForEach(ReminderTab.allCases, id: \.self) { tab in
-                    switch tab {
-                    case .today:
-                        Text("Today (\(viewModel.todayCount))")
-                    case .upcoming:
-                        Text("Upcoming (\(viewModel.upcomingCount))")
-                    case .overdue:
-                        Text("Overdue (\(viewModel.overdueCount))")
-                    }
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            GlassTabBar(
+                selectedTab: $viewModel.selectedTab,
+                todayCount: viewModel.todayCount,
+                upcomingCount: viewModel.upcomingCount,
+                overdueCount: viewModel.overdueCount
+            )
 
-            if viewModel.filteredReminders.isEmpty {
-                ContentUnavailableView {
-                    Label(emptyTitle, systemImage: emptyIcon)
-                } description: {
-                    Text(emptyDescription)
-                } actions: {
-                    Button("Add Reminder") {
-                        showAddSheet = true
+            Group {
+                if viewModel.filteredReminders.isEmpty {
+                    ContentUnavailableView {
+                        Label(emptyTitle, systemImage: emptyIcon)
+                    } description: {
+                        Text(emptyDescription)
+                    } actions: {
+                        Button("Add Reminder") {
+                            showAddSheet = true
+                        }
                     }
-                }
-            } else {
-                List(viewModel.filteredReminders) { reminder in
-                    NavigationLink(value: reminder.persistentModelID) {
-                        ReminderRowView(
-                            reminder: reminder,
-                            onDone: { viewModel.markAsDone(reminder) },
-                            onSkip: { viewModel.markAsSkipped(reminder) }
-                        )
+                    .transition(.opacity)
+                } else {
+                    List(viewModel.filteredReminders) { reminder in
+                        NavigationLink(value: reminder.persistentModelID) {
+                            ReminderRowView(
+                                reminder: reminder,
+                                onDone: { viewModel.markAsDone(reminder) },
+                                onSkip: { viewModel.markAsSkipped(reminder) }
+                            )
+                        }
                     }
+                    .listStyle(.plain)
+                    .transition(.opacity)
                 }
-                .listStyle(.plain)
             }
+            .animation(.easeOut(duration: 0.15), value: viewModel.selectedTab)
+            .animation(.easeOut(duration: 0.15), value: viewModel.filteredReminders.isEmpty)
         }
         .searchable(text: $viewModel.searchText, prompt: "Search reminders")
         .navigationDestination(for: PersistentIdentifier.self) { id in
