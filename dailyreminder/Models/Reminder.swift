@@ -79,6 +79,7 @@ final class Reminder {
     var customCategoryName: String?
     var createdAt: Date
     var completedAt: Date?
+    var snoozeUntil: Date?
 
     init(
         title: String,

@@ -53,6 +53,7 @@ private struct GlassTabBar: View {
     let todayCount: Int
     let upcomingCount: Int
     let overdueCount: Int
+    let monthCount: Int
     @Namespace private var tabAnimation
 
     var body: some View {
@@ -64,17 +65,17 @@ private struct GlassTabBar: View {
                         selectedTab = tab
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: iconFor(tab))
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .symbolEffect(.bounce, value: isSelected)
 
                         Text(labelFor(tab))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
 
                         Text("\(countFor(tab))")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .padding(.horizontal, 6)
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
@@ -133,6 +134,7 @@ private struct GlassTabBar: View {
         case .today: "sun.max.fill"
         case .upcoming: "calendar.badge.clock"
         case .overdue: "exclamationmark.triangle.fill"
+        case .month: "calendar"
         }
     }
 
@@ -141,6 +143,7 @@ private struct GlassTabBar: View {
         case .today: "Today"
         case .upcoming: "Soon"
         case .overdue: "Late"
+        case .month: "Month"
         }
     }
 
@@ -149,6 +152,7 @@ private struct GlassTabBar: View {
         case .today: todayCount
         case .upcoming: upcomingCount
         case .overdue: overdueCount
+        case .month: monthCount
         }
     }
 
@@ -166,6 +170,10 @@ private struct GlassTabBar: View {
             Color(red: 0.90, green: 0.35, blue: 0.30),
             Color(red: 0.85, green: 0.25, blue: 0.40)
         ]
+        case .month: [
+            Color(red: 0.15, green: 0.65, blue: 0.60),
+            Color(red: 0.20, green: 0.55, blue: 0.70)
+        ]
         }
     }
 
@@ -174,6 +182,7 @@ private struct GlassTabBar: View {
         case .today: .blue.opacity(0.3)
         case .upcoming: .purple.opacity(0.3)
         case .overdue: .red.opacity(0.3)
+        case .month: .teal.opacity(0.3)
         }
     }
 }
@@ -190,11 +199,14 @@ private struct HomeContentView: View {
                 selectedTab: $viewModel.selectedTab,
                 todayCount: viewModel.todayCount,
                 upcomingCount: viewModel.upcomingCount,
-                overdueCount: viewModel.overdueCount
+                overdueCount: viewModel.overdueCount,
+                monthCount: viewModel.monthCount
             )
 
             Group {
-                if viewModel.filteredReminders.isEmpty {
+                if viewModel.selectedTab == .month {
+                    MonthlyCalendarView(viewModel: viewModel)
+                } else if viewModel.filteredReminders.isEmpty {
                     ContentUnavailableView {
                         Label(emptyTitle, systemImage: emptyIcon)
                     } description: {
@@ -220,13 +232,15 @@ private struct HomeContentView: View {
                 }
             }
             .animation(.easeOut(duration: 0.15), value: viewModel.selectedTab)
-            .animation(.easeOut(duration: 0.15), value: viewModel.filteredReminders.isEmpty)
         }
         .searchable(text: $viewModel.searchText, prompt: "Search reminders")
         .navigationDestination(for: PersistentIdentifier.self) { id in
             if let reminder = viewModel.reminder(for: id) {
                 ReminderDetailView(reminder: reminder, viewModel: viewModel)
             }
+        }
+        .navigationDestination(for: Date.self) { date in
+            DayDetailView(date: date, viewModel: viewModel)
         }
     }
 
@@ -237,6 +251,7 @@ private struct HomeContentView: View {
         case .today: "Nothing Due Today"
         case .upcoming: "No Upcoming Reminders"
         case .overdue: "No Overdue Reminders"
+        case .month: ""
         }
     }
 
@@ -245,6 +260,7 @@ private struct HomeContentView: View {
         case .today: "checkmark.circle"
         case .upcoming: "calendar"
         case .overdue: "clock"
+        case .month: "calendar"
         }
     }
 
@@ -253,6 +269,7 @@ private struct HomeContentView: View {
         case .today: "You're all caught up! Tap below to add a new reminder."
         case .upcoming: "No reminders scheduled for the future."
         case .overdue: "Great job! Nothing is overdue."
+        case .month: ""
         }
     }
 }

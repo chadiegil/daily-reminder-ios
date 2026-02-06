@@ -1,5 +1,33 @@
 import SwiftUI
 
+struct SnoozeCountdownView: View {
+    let snoozeUntil: Date
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bell.and.waves.left.and.right")
+                .font(.title3)
+                .foregroundStyle(.indigo)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Snoozed")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(snoozeUntil, style: .timer)
+                    .font(.system(.title2, design: .monospaced, weight: .semibold))
+                    .foregroundStyle(.indigo)
+            }
+
+            Spacer()
+
+            Text("remaining")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 struct ReminderDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -8,6 +36,8 @@ struct ReminderDetailView: View {
 
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
+    @State private var showSnoozeOptions = false
+    @State private var snoozeActive = false
 
     var body: some View {
         List {
@@ -44,6 +74,12 @@ struct ReminderDetailView: View {
                 }
             }
 
+            if snoozeActive, let snoozeUntil = reminder.snoozeUntil {
+                Section("Snooze Timer") {
+                    SnoozeCountdownView(snoozeUntil: snoozeUntil)
+                }
+            }
+
             Section("Schedule") {
                 LabeledContent("Due Date", value: reminder.dueDate.formatted_shortDate)
                 LabeledContent("Repeat", value: reminder.repeatOption.rawValue)
@@ -76,6 +112,13 @@ struct ReminderDetailView: View {
                         Label("Skip", systemImage: "forward.fill")
                     }
                     .tint(.orange)
+
+                    Button {
+                        showSnoozeOptions = true
+                    } label: {
+                        Label("Snooze", systemImage: "bell.and.waves.left.and.right")
+                    }
+                    .tint(.indigo)
                 } else {
                     Button {
                         viewModel.resetToPending(reminder)
@@ -104,6 +147,21 @@ struct ReminderDetailView: View {
         .sheet(isPresented: $showEditSheet) {
             AddReminderView(viewModel: viewModel, editingReminder: reminder)
         }
+        .alert("Snooze for", isPresented: $showSnoozeOptions) {
+            Button("1 minute") {
+                viewModel.snoozeReminder(reminder, duration: .oneMinute)
+            }
+            Button("30 minutes") {
+                viewModel.snoozeReminder(reminder, duration: .thirtyMinutes)
+            }
+            Button("1 hour") {
+                viewModel.snoozeReminder(reminder, duration: .oneHour)
+            }
+            Button("Tomorrow") {
+                viewModel.snoozeReminder(reminder, duration: .tomorrow)
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .alert("Delete Reminder", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 dismiss()
@@ -112,6 +170,22 @@ struct ReminderDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Are you sure you want to delete \"\(reminder.title)\"? This action cannot be undone.")
+        }
+        .task(id: reminder.snoozeUntil) {
+            guard let snoozeUntil = reminder.snoozeUntil else {
+                snoozeActive = false
+                return
+            }
+            let remaining = snoozeUntil.timeIntervalSinceNow
+            if remaining <= 0 {
+                snoozeActive = false
+                reminder.snoozeUntil = nil
+                return
+            }
+            snoozeActive = true
+            try? await Task.sleep(for: .seconds(remaining))
+            snoozeActive = false
+            reminder.snoozeUntil = nil
         }
     }
 }

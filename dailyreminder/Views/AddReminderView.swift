@@ -12,6 +12,7 @@ struct AddReminderView: View {
     @State private var repeatOption: RepeatOption = .never
     @State private var notes: String = ""
     @State private var customCategoryName: String = ""
+    @FocusState private var titleFocused: Bool
 
     private var isEditing: Bool { editingReminder != nil }
 
@@ -20,6 +21,7 @@ struct AddReminderView: View {
             Form {
                 Section("Details") {
                     TextField("Title", text: $title)
+                        .focused($titleFocused)
 
                     Picker("Category", selection: $category) {
                         ForEach(ReminderCategory.allCases, id: \.self) { cat in
@@ -35,7 +37,6 @@ struct AddReminderView: View {
 
                 Section("Schedule") {
                     DatePicker("Due Date", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
-                        .datePickerStyle(.graphical)
 
                     Picker("Repeat", selection: $repeatOption) {
                         ForEach(RepeatOption.allCases, id: \.self) { option in
@@ -74,6 +75,9 @@ struct AddReminderView: View {
                     repeatOption = reminder.repeatOption
                     notes = reminder.notes
                     customCategoryName = reminder.customCategoryName ?? ""
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    titleFocused = true
                 }
             }
         }
